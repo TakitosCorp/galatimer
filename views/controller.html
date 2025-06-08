@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control del Temporizador</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      background-image: url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/12b9ca99272ee940e96412ffebad8f4d-1024x576-tQKhTYlFqTMw951xptI0fcdI9p7kWN.png');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0;
+      padding: 1.25rem;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .gradient-bg {
+      background-image: linear-gradient(to right, rgba(126, 34, 206, 0.75), rgba(67, 56, 202, 0.75));
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    .btn {
+      transition: all 0.2s ease;
+      background: #1e40af;
+      /* Azul oscuro */
+      opacity: 1;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn.active {
+      background: #1e3a8a;
+      /* Azul más oscuro */
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+      transform: scale(0.98);
+    }
+
+    .btn:not(:disabled):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
+      background: #2563eb;
+      /* Azul más claro para hover */
+    }
+
+    .gradient-text {
+      background-image: linear-gradient(to right, rgba(126, 34, 206, 0.85), rgba(67, 56, 202, 0.85));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .time-separator {
+      animation: blink 1s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      50% {
+        opacity: 1;
+      }
+
+      51%,
+      100% {
+        opacity: 0.5;
+      }
+    }
+
+    .emoji-container {
+      background: #f0f9ff;
+      border: 2px solid #93c5fd;
+      color: #1e40af;
+      padding: 0.25rem;
+      border-radius: 0.375rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="w-full max-w-6xl">
+    <div class="bg-white/90 backdrop-blur-md rounded-lg p-6 border-2 border-purple-500 shadow-lg">
+      <header class="flex items-center justify-between mb-4 border-b border-purple-200 pb-3">
+        <div class="flex items-center">
+          <span class="emoji-container mr-2">⏱️</span>
+          <h1 class="text-2xl font-semibold gradient-text">Control del Temporizador</h1>
+        </div>
+        <div id="status" class="flex items-center bg-purple-50 px-3 py-1 rounded-full border border-purple-200 text-sm font-medium">
+          <span class="bg-green-500 w-2 h-2 rounded-full mr-2 animate-pulse"></span>
+          <span class="text-purple-700">Conectado</span>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="gradient-bg rounded-lg p-5 border border-purple-300 shadow-md">
+          <h2 class="text-lg font-medium text-white mb-4 pb-2 border-b border-white/30 flex items-center">
+            <span class="emoji-container mr-2">💰</span>
+            Plataformas de Donación
+          </h2>
+
+          <div class="bg-white/90 rounded-md shadow-sm">
+            <table class="w-full">
+              <thead>
+                <tr class="gradient-bg text-white">
+                  <th class="p-2 text-left">Plataforma</th>
+                  <th class="p-2 text-center">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b border-purple-100 hover:bg-purple-50/50 transition-colors">
+                  <td class="p-3 font-medium flex items-center">
+                    <span class="emoji-container mr-2">☕</span>
+                    Ko-fi
+                  </td>
+                  <td class="p-3 text-center">
+                    <button class="kofi-btn btn gradient-bg hover:bg-purple-700 text-white px-4 py-1.5 rounded font-medium text-sm">
+                      +5 min
+                    </button>
+                  </td>
+                </tr>
+                <tr class="border-b border-purple-100 hover:bg-purple-50/50 transition-colors">
+                  <td class="p-3 font-medium flex items-center">
+                    <span class="emoji-container mr-2">🎁</span>
+                    Cofre
+                  </td>
+                  <td class="p-3 text-center">
+                    <button class="chest-btn btn gradient-bg hover:bg-purple-700 text-white px-4 py-1.5 rounded font-medium text-sm">
+                      +5 min
+                    </button>
+                  </td>
+                </tr>
+                <tr class="hover:bg-purple-50/50 transition-colors">
+                  <td class="p-3 font-medium flex items-center">
+                    <span class="emoji-container mr-2">👑</span>
+                    Membresía
+                  </td>
+                  <td class="p-3 text-center">
+                    <button class="membership-btn btn gradient-bg hover:bg-purple-700 text-white px-4 py-1.5 rounded font-medium text-sm">
+                      +7 min
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="gradient-bg rounded-lg p-5 border border-purple-300 shadow-md">
+          <h2 class="text-lg font-medium text-white mb-4 pb-2 border-b border-white/30 flex items-center">
+            <span class="emoji-container mr-2">🎛️</span>
+            Control Manual
+          </h2>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-white/90 p-4 rounded-md shadow-sm col-span-2">
+              <div class="flex flex-wrap items-end">
+                <div class="w-1/3 px-2">
+                  <label class="block text-sm font-medium text-purple-600 mb-1">Horas</label>
+                  <input type="number" id="hours" min="0" max="23" value="0" class="w-full p-2 border border-purple-200 rounded text-center focus:border-purple-400 focus:ring focus:ring-purple-100 focus:outline-none transition-all">
+                </div>
+                <div class="w-1/3 px-2">
+                  <label class="block text-sm font-medium text-purple-600 mb-1">Minutos</label>
+                  <input type="number" id="minutes" min="0" max="59" value="0" class="w-full p-2 border border-purple-200 rounded text-center focus:border-purple-400 focus:ring focus:ring-purple-100 focus:outline-none transition-all">
+                </div>
+                <div class="w-1/3 px-2">
+                  <label class="block text-sm font-medium text-purple-600 mb-1">Segundos</label>
+                  <input type="number" id="seconds" min="0" max="59" value="0" class="w-full p-2 border border-purple-200 rounded text-center focus:border-purple-400 focus:ring focus:ring-purple-100 focus:outline-none transition-all">
+                </div>
+              </div>
+            </div>
+
+            <button id="set-timer" class="btn gradient-bg hover:opacity-90 text-white py-2 px-4 rounded flex items-center justify-center font-medium">
+              <span class="mr-1">📝</span> Establecer
+            </button>
+
+            <button id="start" class="btn gradient-bg hover:opacity-90 text-white py-2 px-4 rounded flex items-center justify-center font-medium">
+              <span class="mr-1">▶️</span> Iniciar
+            </button>
+
+            <button id="pause" class="btn gradient-bg hover:opacity-90 text-white py-2 px-4 rounded flex items-center justify-center font-medium">
+              <span class="mr-1">⏸️</span> Pausar
+            </button>
+
+            <button id="reset" class="btn gradient-bg hover:opacity-90 text-white py-2 px-4 rounded flex items-center justify-center font-medium">
+              <span class="mr-1">🔄</span> Reiniciar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let socket;
+    try {
+      socket = io();
+    } catch (e) {
+      console.log('WebSocket no disponible');
+    }
+
+    let timerState = {
+      remainingSeconds: 4 * 60 * 60,
+      isPaused: false,
+      lastPauseTime: null
+    };
+
+    const hoursInput = document.getElementById('hours');
+    const minutesInput = document.getElementById('minutes');
+    const secondsInput = document.getElementById('seconds');
+    const setTimerBtn = document.getElementById('set-timer');
+    const startBtn = document.getElementById('start');
+    const pauseBtn = document.getElementById('pause');
+    const resetBtn = document.getElementById('reset');
+    const statusEl = document.getElementById('status');
+
+    let lastSync = Date.now();
+
+    function updateStatus(isConnected) {
+      const statusSpan = statusEl.querySelector('span:last-child');
+      const statusDot = statusEl.querySelector('span:first-child');
+      statusSpan.textContent = isConnected ? 'Conectado' : 'Desconectado';
+      statusDot.className = isConnected ?
+        "bg-green-500 w-2 h-2 rounded-full mr-2 animate-pulse" :
+        "bg-red-500 w-2 h-2 rounded-full mr-2 animate-pulse";
+    }
+
+    function updateDisplay() {
+      startBtn.disabled = !timerState.isPaused;
+      pauseBtn.disabled = timerState.isPaused;
+
+      if (timerState.isPaused) {
+        startBtn.classList.remove('active');
+        pauseBtn.classList.add('active');
+      } else {
+        startBtn.classList.add('active');
+        pauseBtn.classList.remove('active');
+      }
+    }
+
+    if (socket) {
+      socket.on('timer-state', (state) => {
+        timerState = state;
+        updateDisplay();
+        lastSync = Date.now();
+      });
+
+      socket.on('timer-sync', (data) => {
+        timerState.remainingSeconds = data.remainingSeconds;
+        timerState.isPaused = data.isPaused;
+        updateDisplay();
+        lastSync = Date.now();
+      });
+
+      setInterval(() => {
+        socket.emit('request-sync');
+      }, 4000);
+    }
+
+    function addTime(minutes, platform) {
+      if (socket && socket.connected) {
+        socket.emit('set-timer', {
+          hours: 0,
+          minutes: minutes,
+          seconds: 0,
+          source: "donation",
+          platform: platform
+        });
+      }
+    }
+
+    document.querySelector('.kofi-btn').addEventListener('click', () => addTime(5, 'Ko-fi'));
+    document.querySelector('.chest-btn').addEventListener('click', () => addTime(5, 'Cofre'));
+    document.querySelector('.membership-btn').addEventListener('click', () => addTime(7, 'Membresía'));
+
+    setTimerBtn.addEventListener('click', () => {
+      const hours = parseInt(hoursInput.value) || 0;
+      const minutes = parseInt(minutesInput.value) || 0;
+      const seconds = parseInt(secondsInput.value) || 0;
+
+      if (hours === 0 && minutes === 0 && seconds === 0) {
+        return;
+      }
+
+      const timerData = {
+        hours,
+        minutes,
+        seconds,
+        timestamp: Date.now()
+      };
+
+      if (socket) {
+        socket.emit('set-timer', timerData);
+        console.log('Estableciendo nuevo temporizador:', timerData);
+      }
+    });
+
+    startBtn.addEventListener('click', () => {
+      if (socket) {
+        socket.emit('timer-control', {
+          action: 'start'
+        });
+        console.log('Iniciando temporizador');
+      }
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      if (socket) {
+        socket.emit('timer-control', {
+          action: 'pause'
+        });
+        console.log('Pausando temporizador');
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      if (socket) {
+        socket.emit('timer-control', {
+          action: 'reset'
+        });
+        console.log('Reiniciando temporizador');
+      }
+    });
+
+    setInterval(() => {
+      if (Date.now() - lastSync > 5000) {
+        updateStatus(false);
+        socket.connect();
+      }
+    }, 1000);
+
+    if (socket && socket.connected) {
+      socket.emit('request-sync');
+    }
+
+    setInterval(() => {
+      if (socket && socket.connected) {
+        socket.emit('request-sync');
+      }
+    }, 4000);
+  </script>
+</body>
+
+</html>

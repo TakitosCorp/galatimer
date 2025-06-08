@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBS Countdown Widget</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 800px;
+      height: 300px;
+      background: transparent;
+      font-family: 'Fredoka One', cursive;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .countdown-widget {
+      width: 700px;
+      height: 200px;
+      background-image: url('/bg.png');
+      background-size: cover;
+      background-position: center;
+      border: 8px solid #000;
+      border-radius: 30px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .countdown-display {
+      font-size: 4.5rem;
+      color: #581c87;
+      text-shadow:
+        1px 1px 0px #fff,
+        -1px -1px 0px #fff,
+        1px -1px 0px #fff,
+        -1px 1px 0px #fff;
+      letter-spacing: 0.02em;
+      z-index: 2;
+      margin-left: 40px;
+      text-align: left;
+    }
+
+    .time-unit {
+      display: inline-block;
+      min-width: 86px;
+      text-align: center;
+    }
+
+    .time-separator {
+      margin: 0 -5px;
+      display: inline-block;
+      color: #7c2d92;
+      animation: blink 1s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      50% {
+        opacity: 1;
+      }
+
+      51%,
+      100% {
+        opacity: 0.5;
+      }
+    }
+
+    .character {
+      position: absolute;
+      right: -30px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 220px;
+      height: 220px;
+      z-index: 3;
+    }
+
+    .character img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: transparent;
+    }
+
+    .warning .countdown-display {
+      color: #991b1b;
+    }
+
+    .finished .countdown-display {
+      color: #166534;
+      font-size: 3rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="countdown-widget" id="widget">
+    <div class="countdown-display" id="countdown">
+      <span class="time-unit" id="hours">00</span>
+      <span class="time-separator" id="sep1">:</span>
+      <span class="time-unit" id="minutes">00</span>
+      <span class="time-separator" id="sep2">:</span>
+      <span class="time-unit" id="seconds">00</span>
+    </div>
+    <div class="character" id="character">
+      <img src="/lightstick_gala.png" alt="Character" id="characterImg">
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io({
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+      timeout: 5000
+    });
+
+    const elements = {
+      widget: document.getElementById('widget'),
+      countdown: document.getElementById('countdown'),
+      hours: document.getElementById('hours'),
+      minutes: document.getElementById('minutes'),
+      seconds: document.getElementById('seconds'),
+      character: document.getElementById('character')
+    };
+
+    const state = {
+      remainingSeconds: 4 * 60 * 60,
+      isPaused: false,
+      lastPauseTime: null,
+      lastUpdate: {
+        hours: '00',
+        minutes: '00',
+        seconds: '00'
+      },
+      isConnected: false,
+      localTimerActive: false
+    };
+
+    function startLocalTimer() {
+      if (state.localTimerActive) return;
+
+      let lastTick = Date.now();
+      state.localTimerActive = true;
+
+      function tick() {
+        if (!state.localTimerActive) return;
+
+        const now = Date.now();
+        if (state.lastPauseTime) {
+          lastTick += now - state.lastPauseTime;
+          state.lastPauseTime = null;
+        }
+
+        const delta = now - lastTick;
+
+        if (delta >= 1000 && !state.isPaused && state.remainingSeconds > 0) {
+          state.remainingSeconds--;
+          lastTick = now;
+          updateDisplay();
+        }
+
+        requestAnimationFrame(tick);
+      }
+
+      requestAnimationFrame(tick);
+    }
+
+    function stopLocalTimer() {
+      state.localTimerActive = false;
+    }
+
+    function initAnimations() {
+      gsap.to(character, {
+        y: -5,
+        duration: 3,
+        ease: "power1.inOut",
+        yoyo: true,
+        repeat: -1
+      });
+
+      gsap.to(character, {
+        rotation: "3",
+        duration: 4,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: -1
+      });
+    }
+
+    function animateNumberChange(element) {
+      gsap.fromTo(element, {
+        scale: 1.1,
+        opacity: 0.7
+      }, {
+        scale: 1,
+        opacity: 1,
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    }
+
+    function updateDisplay(force = false) {
+      if (state.remainingSeconds <= 0) {
+        elements.countdown.innerHTML = '¡TIEMPO!';
+        elements.widget.classList.add('finished');
+        return;
+      }
+
+      const hours = Math.floor(state.remainingSeconds / 3600);
+      const minutes = Math.floor((state.remainingSeconds % 3600) / 60);
+      const seconds = state.remainingSeconds % 60;
+
+      const current = {
+        hours: hours.toString().padStart(2, '0'),
+        minutes: minutes.toString().padStart(2, '0'),
+        seconds: seconds.toString().padStart(2, '0')
+      };
+
+      if (current.hours !== state.lastUpdate.hours) {
+        elements.hours.textContent = current.hours;
+        animateNumberChange(elements.hours);
+      }
+      if (current.minutes !== state.lastUpdate.minutes) {
+        elements.minutes.textContent = current.minutes;
+        animateNumberChange(elements.minutes);
+      }
+      if (current.seconds !== state.lastUpdate.seconds) {
+        elements.seconds.textContent = current.seconds;
+        animateNumberChange(elements.seconds);
+      }
+
+      Object.assign(state.lastUpdate, current);
+
+      if (hours === 0 && minutes < 5) {
+        elements.widget.classList.add('warning');
+      } else {
+        elements.widget.classList.remove('warning');
+      }
+    }
+
+    socket.on('connect', () => {
+      state.isConnected = true;
+      socket.emit('request-state');
+    });
+
+    socket.on('disconnect', () => {
+      state.isConnected = false;
+      startLocalTimer();
+    });
+
+    socket.on('timer-state', (serverState) => {
+      if (Math.abs(state.remainingSeconds - serverState.remainingSeconds) > 2 || state.lastPauseTime !== serverState.lastPauseTime) {
+        state.remainingSeconds = serverState.remainingSeconds;
+        state.lastPauseTime = serverState.lastPauseTime;
+        updateDisplay(true);
+      }
+      state.isPaused = serverState.isPaused;
+    });
+
+    socket.on('timer-command', (command) => {
+      if (command.action === 'pause') {
+        state.isPaused = true;
+        state.lastPauseTime = Date.now();
+        gsap.to([elements.hours, elements.minutes, elements.seconds], {
+          opacity: 0.5,
+          duration: 0.3
+        });
+      } else if (command.action === 'start') {
+        state.isPaused = false;
+        state.lastPauseTime = null;
+        gsap.to([elements.hours, elements.minutes, elements.seconds], {
+          opacity: 1,
+          duration: 0.3
+        });
+      }
+    });
+
+    socket.on('timer-sync', (serverState) => {
+      const diff = Math.abs(state.remainingSeconds - serverState.remainingSeconds);
+      if (diff > 1) {
+        state.remainingSeconds = serverState.remainingSeconds;
+        state.lastPauseTime = serverState.lastPauseTime;
+        state.isPaused = serverState.isPaused;
+        updateDisplay();
+      }
+    });
+
+    window.addEventListener('load', () => {
+      initAnimations();
+      startLocalTimer();
+
+      setInterval(() => {
+        if (socket && socket.connected) {
+          socket.emit('request-sync');
+        }
+      }, 4000);
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "galatimer",
+  "version": "1.0.0",
+  "description": "Temporizador con WebSocket para OBS",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "dev": "nodemon main.js --ignore data"
+  },
+  "keywords": [
+    "timer",
+    "countdown",
+    "obs",
+    "websocket"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
