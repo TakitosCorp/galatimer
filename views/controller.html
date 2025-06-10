@@ -209,15 +209,22 @@
   </div>
 
   <script>
-    let socket;
-    try {
-      socket = io();
-    } catch (e) {
-      console.log('WebSocket no disponible');
+    function generateClientId() {
+      return 'ctrl_' + Date.now().toString(36) + Math.random().toString(36).substr(2);
     }
 
+    const CLIENT_ID = localStorage.getItem('controller_client_id') || generateClientId();
+    localStorage.setItem('controller_client_id', CLIENT_ID);
+
+    let socket = io({
+      query: {
+        clientId: CLIENT_ID,
+        type: 'controller'
+      }
+    });
+
     let timerState = {
-      remainingSeconds: 4 * 60 * 60,
+      remainingSeconds: 4 * 60 * 60, // 4 horas
       isPaused: false,
       lastPauseTime: null
     };
@@ -255,35 +262,18 @@
       }
     }
 
-    if (socket) {
-      socket.on('timer-state', (state) => {
-        timerState = state;
-        updateDisplay();
-        lastSync = Date.now();
-      });
-
-      socket.on('timer-sync', (data) => {
-        timerState.remainingSeconds = data.remainingSeconds;
-        timerState.isPaused = data.isPaused;
-        updateDisplay();
-        lastSync = Date.now();
-      });
-
-      setInterval(() => {
-        socket.emit('request-sync');
-      }, 4000);
-    }
+    socket.on('timer-state', (state) => {
+      timerState = state;
+      updateDisplay();
+    });
 
     function addTime(minutes, platform) {
-      if (socket && socket.connected) {
-        socket.emit('set-timer', {
-          hours: 0,
-          minutes: minutes,
-          seconds: 0,
-          source: "donation",
-          platform: platform
-        });
-      }
+      socket.emit('add-time', {
+        hours: 0,
+        minutes: minutes,
+        seconds: 0,
+        platform: platform
+      });
     }
 
     document.querySelector('.kofi-btn').addEventListener('click', () => addTime(5, 'Ko-fi'));
@@ -299,62 +289,33 @@
         return;
       }
 
-      const timerData = {
+      socket.emit('add-time', {
         hours,
         minutes,
-        seconds,
-        timestamp: Date.now()
-      };
-
-      if (socket) {
-        socket.emit('set-timer', timerData);
-        console.log('Estableciendo nuevo temporizador:', timerData);
-      }
+        seconds
+      });
     });
 
     startBtn.addEventListener('click', () => {
-      if (socket) {
-        socket.emit('timer-control', {
-          action: 'start'
-        });
-        console.log('Iniciando temporizador');
-      }
+      socket.emit('timer-control', {
+        action: 'start'
+      });
+      console.log('Iniciando temporizador');
     });
 
     pauseBtn.addEventListener('click', () => {
-      if (socket) {
-        socket.emit('timer-control', {
-          action: 'pause'
-        });
-        console.log('Pausando temporizador');
-      }
+      socket.emit('timer-control', {
+        action: 'pause'
+      });
+      console.log('Pausando temporizador');
     });
 
     resetBtn.addEventListener('click', () => {
-      if (socket) {
-        socket.emit('timer-control', {
-          action: 'reset'
-        });
-        console.log('Reiniciando temporizador');
-      }
+      socket.emit('timer-control', {
+        action: 'reset'
+      });
+      console.log('Reiniciando temporizador');
     });
-
-    setInterval(() => {
-      if (Date.now() - lastSync > 5000) {
-        updateStatus(false);
-        socket.connect();
-      }
-    }, 1000);
-
-    if (socket && socket.connected) {
-      socket.emit('request-sync');
-    }
-
-    setInterval(() => {
-      if (socket && socket.connected) {
-        socket.emit('request-sync');
-      }
-    }, 4000);
   </script>
 </body>
 
