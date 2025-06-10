@@ -2,6 +2,8 @@ services:
   galatimer:
     build: .
     restart: unless-stopped
+    ports:
+      - "3004:3004"
     volumes:
       - galatimer-data:/home/node/app/data
 
