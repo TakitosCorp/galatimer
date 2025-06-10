@@ -1,0 +1,9 @@
+services:
+  galatimer:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - galatimer-data:/home/node/app/data
+
+volumes:
+  galatimer-data:

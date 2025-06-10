@@ -9,7 +9,7 @@ const https = require("https");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3004;
 const STATE_FILE = path.join(__dirname, "data", "timer-state.json");
 const CODE_FILE = path.join(__dirname, "data", "code.json");
 
