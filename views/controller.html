@@ -32,7 +32,6 @@
     .btn {
       transition: all 0.2s ease;
       background: #1e40af;
-      /* Azul oscuro */
       opacity: 1;
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
@@ -44,7 +43,6 @@
 
     .btn.active {
       background: #1e3a8a;
-      /* Azul más oscuro */
       box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
       transform: scale(0.98);
     }
@@ -53,7 +51,6 @@
       transform: translateY(-2px);
       box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
       background: #2563eb;
-      /* Azul más claro para hover */
     }
 
     .gradient-text {
@@ -164,9 +161,18 @@
         </div>
 
         <div class="gradient-bg rounded-lg p-5 border border-purple-300 shadow-md">
-          <h2 class="text-lg font-medium text-white mb-4 pb-2 border-b border-white/30 flex items-center">
-            <span class="emoji-container mr-2">🎛️</span>
-            Control Manual
+          <h2 class="text-lg font-medium text-white mb-4 pb-2 border-b border-white/30 flex items-center justify-between">
+            <span class="flex items-center">
+              <span class="emoji-container mr-2">🎛️</span>
+              Control Manual
+            </span>
+            <label class="flex items-center cursor-pointer select-none ml-4">
+              <span id="set-mode-label" class="mr-2 text-xs text-white font-semibold">Sumar</span>
+              <input type="checkbox" id="set-mode-switch" class="sr-only">
+              <span class="w-10 h-5 flex items-center bg-purple-200 rounded-full p-1 duration-300 ease-in-out">
+                <span class="dot bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out"></span>
+              </span>
+            </label>
           </h2>
 
           <div class="grid grid-cols-2 gap-4">
@@ -224,7 +230,7 @@
     });
 
     let timerState = {
-      remainingSeconds: 4 * 60 * 60, // 4 horas
+      remainingSeconds: 4 * 60 * 60,
       isPaused: false,
       lastPauseTime: null
     };
@@ -237,6 +243,10 @@
     const pauseBtn = document.getElementById('pause');
     const resetBtn = document.getElementById('reset');
     const statusEl = document.getElementById('status');
+
+    const setModeSwitch = document.getElementById('set-mode-switch');
+    const setModeLabel = document.getElementById('set-mode-label');
+    let setMode = false;
 
     let lastSync = Date.now();
 
@@ -280,6 +290,21 @@
     document.querySelector('.chest-btn').addEventListener('click', () => addTime(5, 'Cofre'));
     document.querySelector('.membership-btn').addEventListener('click', () => addTime(7, 'Membresía'));
 
+    setModeSwitch.addEventListener('change', () => {
+      setMode = setModeSwitch.checked;
+      setModeLabel.textContent = setMode ? 'Establecer' : 'Sumar';
+      const dot = setModeSwitch.nextElementSibling.querySelector('.dot');
+      if (setMode) {
+        dot.style.transform = 'translateX(20px)';
+        dot.style.background = '#a21caf';
+      } else {
+        dot.style.transform = '';
+        dot.style.background = '#fff';
+      }
+    });
+
+    setModeSwitch.dispatchEvent(new Event('change'));
+
     setTimerBtn.addEventListener('click', () => {
       const hours = parseInt(hoursInput.value) || 0;
       const minutes = parseInt(minutesInput.value) || 0;
@@ -289,32 +314,37 @@
         return;
       }
 
-      socket.emit('add-time', {
-        hours,
-        minutes,
-        seconds
-      });
+      if (setMode) {
+        socket.emit('set-timer', {
+          hours,
+          minutes,
+          seconds
+        });
+      } else {
+        socket.emit('add-time', {
+          hours,
+          minutes,
+          seconds
+        });
+      }
     });
 
     startBtn.addEventListener('click', () => {
       socket.emit('timer-control', {
         action: 'start'
       });
-      console.log('Iniciando temporizador');
     });
 
     pauseBtn.addEventListener('click', () => {
       socket.emit('timer-control', {
         action: 'pause'
       });
-      console.log('Pausando temporizador');
     });
 
     resetBtn.addEventListener('click', () => {
       socket.emit('timer-control', {
         action: 'reset'
       });
-      console.log('Reiniciando temporizador');
     });
   </script>
 </body>

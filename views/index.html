@@ -150,109 +150,91 @@
     };
 
     const state = {
-      remainingSeconds: 4 * 60 * 60, // 4 horas
+      remainingSeconds: 4 * 60 * 60,
       isPaused: false,
       lastPauseTime: null,
       lastUpdate: {
         hours: '04',
         minutes: '00',
         seconds: '00'
-      }
+      },
+      finished: false,
+      isConnected: true,
+      disconnectedAt: null,
+      forcePausedByDisconnect: false
     };
 
-    let lastTick = Date.now();
+    let timerInterval = null;
 
-    function tick() {
-      const now = Date.now();
-      const delta = now - lastTick;
+    function startTimerInterval() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (!state.isConnected) {
+          if (!state.disconnectedAt) state.disconnectedAt = Date.now();
+          const elapsed = (Date.now() - state.disconnectedAt) / 1000;
+          if (elapsed > 10 && !state.forcePausedByDisconnect) {
+            state.forcePausedByDisconnect = true;
+            state.isPaused = true;
+            showDisconnectedWarning(true);
+          }
+        } else {
+          state.disconnectedAt = null;
+          if (state.forcePausedByDisconnect) {
+            state.forcePausedByDisconnect = false;
+            showDisconnectedWarning(false);
+          }
+        }
 
-      if (delta >= 1000 && !state.isPaused && state.remainingSeconds > 0) {
-        state.remainingSeconds--;
-        lastTick = now;
-        updateDisplay();
-        emitUpdate();
+        if (!state.isPaused && state.remainingSeconds > 0) {
+          state.remainingSeconds--;
+          updateDisplay();
+          emitUpdate();
+        } else {
+          updateDisplay();
+        }
+      }, 1000);
+    }
+
+    function showDisconnectedWarning(show) {
+      if (show) {
+        elements.widget.classList.add('warning');
+        elements.countdown.style.opacity = "0.5";
+        elements.countdown.title = "Desconectado del servidor. El temporizador está pausado.";
+      } else {
+        elements.widget.classList.remove('warning');
+        elements.countdown.style.opacity = "1";
+        elements.countdown.title = "";
       }
-
-      requestAnimationFrame(tick);
     }
 
     function emitUpdate() {
-      socket.emit('timer-update', {
-        remainingSeconds: state.remainingSeconds,
-        isPaused: state.isPaused,
-        lastPauseTime: state.lastPauseTime
-      });
-    }
-
-    socket.on('init-state', (serverState) => {
-      Object.assign(state, serverState);
-      updateDisplay(true);
-    });
-
-    socket.on('add-time', (data) => {
-      const additionalSeconds = data.hours * 3600 + data.minutes * 60 + data.seconds;
-      state.remainingSeconds += additionalSeconds;
-      state.isPaused = false;
-      updateDisplay(true);
-      emitUpdate();
-    });
-
-    socket.on('timer-command', (command) => {
-      if (command.action === 'pause') {
-        state.isPaused = true;
-        state.lastPauseTime = Date.now();
-      } else if (command.action === 'start') {
-        state.isPaused = false;
-        if (state.lastPauseTime) {
-          const pauseDuration = Date.now() - state.lastPauseTime;
-          lastTick += pauseDuration;
-        }
-        state.lastPauseTime = null;
-      } else if (command.action === 'reset') {
-        state.remainingSeconds = 4 * 60 * 60; // Reset a 4 horas
-        state.isPaused = false;
-        state.lastPauseTime = null;
-        lastTick = Date.now();
+      if (state.isConnected) {
+        socket.emit('timer-update', {
+          remainingSeconds: state.remainingSeconds,
+          isPaused: state.isPaused,
+          lastPauseTime: state.lastPauseTime
+        });
       }
-      updateDisplay(true);
-      emitUpdate();
-    });
-
-    function initAnimations() {
-      gsap.to(character, {
-        y: -18, // antes: -5
-        duration: 3,
-        ease: "power1.inOut",
-        yoyo: true,
-        repeat: -1
-      });
-
-      gsap.to(character, {
-        rotation: "3",
-        duration: 4,
-        ease: "sine.inOut",
-        yoyo: true,
-        repeat: -1
-      });
-    }
-
-    function animateNumberChange(element) {
-      gsap.fromTo(element, {
-        scale: 1.1,
-        opacity: 0.7
-      }, {
-        scale: 1,
-        opacity: 1,
-        duration: 0.3,
-        ease: "power2.out"
-      });
     }
 
     function updateDisplay(force = false) {
-      if (state.remainingSeconds <= 0) {
-        elements.countdown.innerHTML = '¡TIEMPO!';
-        elements.widget.classList.add('finished');
+      let finishedNow = state.remainingSeconds <= 0;
+      if (finishedNow) {
+        if (!state.finished) {
+          elements.hours.textContent = '🐙';
+          elements.minutes.textContent = '🐙';
+          elements.seconds.textContent = '🐙';
+          document.getElementById('sep1').style.visibility = '';
+          document.getElementById('sep2').style.visibility = '';
+          elements.widget.classList.add('finished');
+          state.finished = true;
+        }
         return;
+      } else {
+        document.getElementById('sep1').style.visibility = '';
+        document.getElementById('sep2').style.visibility = '';
+        elements.widget.classList.remove('finished');
+        state.finished = false;
       }
 
       const hours = Math.floor(state.remainingSeconds / 3600);
@@ -282,45 +264,74 @@
 
       if (hours === 0 && minutes < 5) {
         elements.widget.classList.add('warning');
-      } else {
+      } else if (!state.forcePausedByDisconnect) {
         elements.widget.classList.remove('warning');
       }
     }
 
+    function initAnimations() {
+      gsap.to(character, {
+        y: -18,
+        duration: 3,
+        ease: "power1.inOut",
+        yoyo: true,
+        repeat: -1
+      });
+
+      gsap.to(character, {
+        rotation: "3",
+        duration: 4,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: -1
+      });
+    }
+
+    function animateNumberChange(element) {
+      gsap.fromTo(element, {
+        scale: 1.1,
+        opacity: 0.7
+      }, {
+        scale: 1,
+        opacity: 1,
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    }
+
     socket.on('connect', () => {
       state.isConnected = true;
+      state.disconnectedAt = null;
+      showDisconnectedWarning(false);
       socket.emit('request-state');
+      startTimerInterval();
     });
 
     socket.on('disconnect', () => {
       state.isConnected = false;
-      startLocalTimer();
+      state.disconnectedAt = Date.now();
     });
 
-    socket.on('timer-state', (serverState) => {
-      state.remainingSeconds = serverState.remainingSeconds;
-      state.isPaused = serverState.isPaused;
-      state.lastPauseTime = serverState.lastPauseTime;
+    socket.on('init-state', (serverState) => {
+      Object.assign(state, serverState);
       updateDisplay(true);
     });
 
-    socket.on('request-current-time', () => {
-      socket.emit('timer-update', {
-        remainingSeconds: state.remainingSeconds,
-        isPaused: state.isPaused,
-        lastPauseTime: state.lastPauseTime
-      });
+    socket.on('add-time', (data) => {
+      const additionalSeconds = data.hours * 3600 + data.minutes * 60 + data.seconds;
+      state.remainingSeconds += additionalSeconds;
+      state.isPaused = false;
+      updateDisplay(true);
+      emitUpdate();
     });
 
-    setInterval(() => {
-      if (socket.connected) {
-        socket.emit('timer-update', {
-          remainingSeconds: state.remainingSeconds,
-          isPaused: state.isPaused,
-          lastPauseTime: state.lastPauseTime
-        });
-      }
-    }, 5000);
+    socket.on('set-timer', (data) => {
+      state.remainingSeconds = (data.hours || 0) * 3600 + (data.minutes || 0) * 60 + (data.seconds || 0);
+      state.isPaused = false;
+      state.lastPauseTime = null;
+      updateDisplay(true);
+      emitUpdate();
+    });
 
     socket.on('timer-command', (command) => {
       if (command.action === 'pause') {
@@ -352,7 +363,7 @@
 
     window.addEventListener('load', () => {
       initAnimations();
-      requestAnimationFrame(tick);
+      startTimerInterval();
     });
   </script>
 </body>
