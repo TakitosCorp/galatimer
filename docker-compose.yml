@@ -1,11 +1,20 @@
 services:
-  galatimer:
+  app:
     build: .
     restart: unless-stopped
     ports:
       - "3004:3004"
     volumes:
-      - galatimer-data:/home/node/app/data
+      - gdata:/home/node/app/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CF_TOKEN}
+    depends_on:
+      - app
+    environment:
+      - TUNNEL_ORIGIN_PORT=3004
 
 volumes:
-  galatimer-data:
+  gdata:

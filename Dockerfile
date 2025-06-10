@@ -3,11 +3,13 @@ FROM node:22-alpine
 # Crear directorio de trabajo
 WORKDIR /home/node/app
 
-# Copiar archivos del proyecto
+# Instalar dependencias necesarias
+RUN apk add --no-cache wget
+
+# Copiar archivos de la app
 COPY . /home/node/app
 
 # Instalar dependencias
 RUN npm install
 
-# Comando para iniciar la app
-CMD ["node", "copitas.js"]
+CMD node main.js
