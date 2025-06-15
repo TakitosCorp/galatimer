@@ -123,33 +123,72 @@ function handleKofiDonation(eurAmount, originalAmount, currency, payload) {
   }
 }
 
+function handleKofiSubscription(eurAmount, originalAmount, currency, payload) {
+  if (!eurAmount || eurAmount < 2) {
+    console.log(`[KOFI] Suscripción ignorada tras conversión: ${eurAmount} EUR`);
+    return;
+  }
+
+  const minutes = (eurAmount / 2) * 10; // Las suscripciones dan el doble de tiempo
+  const addSeconds = Math.floor(minutes * 60);
+
+  if (addSeconds > 0) {
+    timerState.remainingSeconds += addSeconds;
+    timerState.isPaused = false;
+    fs.writeFileSync(STATE_FILE, JSON.stringify(timerState));
+    io.emit("add-time", {
+      hours: 0,
+      minutes: Math.floor(addSeconds / 60),
+      seconds: addSeconds % 60,
+      platform: "Ko-fi Suscripción",
+    });
+    io.emit("timer-state", timerState);
+
+    console.log(
+      `[KOFI] Suscripción ${payload.is_first_subscription_payment ? "nueva" : "renovada"}${
+        payload.tier_name ? ` (${payload.tier_name})` : ""
+      }: +${Math.floor(addSeconds / 60)}m ${addSeconds % 60}s ` +
+        `(${originalAmount} ${currency.toUpperCase()} ≈ ${eurAmount.toFixed(2)} EUR) añadidos por ${
+          payload.from_name || "desconocido"
+        }.`
+    );
+  }
+}
+
 app.post("/kofi-webhook", (req, res) => {
   try {
     if (timerState.remainingSeconds === 0) {
-      console.log("[KOFI] Donación recibida pero ignorada porque el timer está en 0.");
+      console.log("[KOFI] Transacción recibida pero ignorada porque el timer está en 0.");
       return res.sendStatus(200);
     }
+
     const payload = JSON.parse(req.body.data);
     console.log("[KOFI] Payload recibido:", payload);
-    if (
-      !payload ||
-      payload.verification_token !== verificationToken ||
-      !payload.type ||
-      payload.type !== "Donation" ||
-      !payload.is_public
-    ) {
-      console.log("[KOFI] Webhook ignorado por verificación/token/tipo/is_public.");
+
+    if (!payload || payload.verification_token !== verificationToken || !payload.is_public) {
+      console.log("[KOFI] Webhook ignorado por verificación/token/is_public.");
       return res.sendStatus(200);
     }
+
     const amount = parseFloat(payload.amount);
     const currency = (payload.currency || "EUR").toLowerCase();
+
     if (isNaN(amount) || amount < 2) {
-      console.log(`[KOFI] Donación ignorada por cantidad insuficiente: ${payload.amount}`);
+      console.log(`[KOFI] Transacción ignorada por cantidad insuficiente: ${payload.amount}`);
       return res.sendStatus(200);
     }
 
     getEurEquivalent(amount, currency, (eurAmount) => {
-      handleKofiDonation(eurAmount, amount, currency, payload);
+      switch (payload.type) {
+        case "Donation":
+          handleKofiDonation(eurAmount, amount, currency, payload);
+          break;
+        case "Subscription":
+          handleKofiSubscription(eurAmount, amount, currency, payload);
+          break;
+        default:
+          console.log(`[KOFI] Tipo de transacción no soportado: ${payload.type}`);
+      }
       res.sendStatus(200);
     });
   } catch (e) {
